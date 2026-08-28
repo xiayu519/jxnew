@@ -1,0 +1,47 @@
+# Local delivery artifacts stay outside the public repository.
+/02-WindowsIL2CPP/
+/03-ResourcePackage/
+
+# Unity-generated state for the clean project.
+/01-CleanProject/UnityProject/[Ll]ibrary/
+/01-CleanProject/UnityProject/[Tt]emp/
+/01-CleanProject/UnityProject/[Oo]bj/
+/01-CleanProject/UnityProject/[Bb]in/
+/01-CleanProject/UnityProject/[Ll]ogs/
+/01-CleanProject/UnityProject/[Bb]uild/
+/01-CleanProject/UnityProject/[Bb]uilds/
+/01-CleanProject/UnityProject/[Bb]undles/
+/01-CleanProject/UnityProject/[Uu]serSettings/
+/01-CleanProject/UnityProject/Assets/StreamingAssets/
+/01-CleanProject/UnityProject/Assets/StreamingAssets.meta
+
+# Original/proprietary game resources are supplied separately.
+/01-CleanProject/UnityProject/Assets/Mods/
+/01-CleanProject/UnityProject/Assets/Mods.meta
+/01-CleanProject/UnityProject/Assets/Shared/
+/01-CleanProject/UnityProject/Assets/Shared.meta
+*.unitypackage
+
+# Generated HybridCLR assemblies are not part of the clean project.
+/01-CleanProject/UnityProject/Assets/AssetRaw/DLL/
+/01-CleanProject/UnityProject/Assets/AssetRaw/DLL.meta
+/01-CleanProject/UnityProject/HybridCLRData/
+
+# IDE-generated files.
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+/.vs/
+**/.idea/
+
+# Agent/spec workspaces must never enter the public clean repository.
+**/.agents/
+**/.codex/
+**/.claude/
+**/openspec/
+
+# OS files.
+.DS_Store
+Thumbs.db

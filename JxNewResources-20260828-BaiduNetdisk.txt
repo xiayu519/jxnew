@@ -1,0 +1,16 @@
+JxNew Mod 开发者资源包
+
+文件名：JxNewResources-20260828.unitypackage
+百度网盘：https://pan.baidu.com/s/1vknNrHuGQTvEfXEoFiPipw
+提取码：huqi
+
+文件大小：4,495,464,431 字节（约 4.19 GiB）
+SHA-256：3EB0EAE45A094EE67F4D81E7B67BF0466488526253870C2890A2267F861B206F
+
+使用方法：
+1. 下载后核对文件名、大小和 SHA-256。
+2. 使用 Unity Hub 打开 01-CleanProject/UnityProject。
+3. 将该 UnityPackage 完整导入工程。
+4. 等待 Unity 导入并完成脚本编译后，运行 01-CleanProject/SetupResources.bat。
+
+注意：此资源包不存放在 Git 仓库中，请勿提交或转存到 Git 历史。

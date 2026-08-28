@@ -1,0 +1,19 @@
+{
+    "name": "JxNewMod.CleanSetup.Editor",
+    "rootNamespace": "JxNewMod.Editor.CleanSetup",
+    "references": [
+        "GUID:e34a5702dd353724aa315fb8011f08c3",
+        "GUID:4d1926c9df5b052469a1c63448b7609a"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

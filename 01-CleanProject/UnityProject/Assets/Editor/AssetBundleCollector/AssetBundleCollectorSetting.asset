@@ -1,0 +1,327 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 185f6993d5150494d98da50e26cb1c25, type: 3}
+  m_Name: AssetBundleCollectorSetting
+  m_EditorClassIdentifier: 
+  ShowPackageView: 1
+  ShowEditorAlias: 1
+  UniqueBundleName: 1
+  Packages:
+  - PackageName: DefaultPackage
+    PackageDesc: 
+    EnableAddressable: 1
+    SupportExtensionless: 1
+    LocationToLower: 0
+    IncludeAssetGUID: 0
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: Actor
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/Actor
+        CollectorGUID: 9c67ce0c9edfd4e4aa1006ee39846d66
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: Audios
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/Audios
+        CollectorGUID: 8ef7a411b66e70f4cb65c2233c9a0868
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: Configs
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/Configs
+        CollectorGUID: dd2928019aef34248af368b99bc53bea
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: DLL
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: DisableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/DLL
+        CollectorGUID: 3aad79ec1ea08c24c891bd3c669d4125
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: Effects
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/Effects
+        CollectorGUID: 0fe175e1e1bd49a4ca71e66b6a9b7237
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: Fonts
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/Fonts
+        CollectorGUID: 2473375c9ee163a4b861278b38091455
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: Materials
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/Materials
+        CollectorGUID: 228b1547e7065d546ad0bf215fd6a276
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: Scenes
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/Scenes
+        CollectorGUID: cace6ee6539f661419b5e5f8ae1c0146
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: UI
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/UI
+        CollectorGUID: 27e87d83814156648b58f380b834e046
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackSeparately
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: UIRaw
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/UIRaw/Atlas
+        CollectorGUID: 6d11fa91acc253840a648b58f23db139
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+      - CollectPath: Assets/AssetRaw/UIRaw/Raw
+        CollectorGUID: 6bc134b912ac6bb4399ea1bec4c11636
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData:
+  - PackageName: JxMod_XinJianXia
+    PackageDesc: New Swordsman Love converted game content
+    EnableAddressable: 1
+    SupportExtensionless: 0
+    LocationToLower: 0
+    IncludeAssetGUID: 1
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: XinJianXiaContent
+      GroupDesc: Converted New Swordsman Love content
+      AssetTags: xin-jian-xia
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Mods/XinJianXia/Content
+        CollectorGUID: 324786468a62414f9604458411f76f77
+        CollectorType: 0
+        AddressRuleName: JxqyAddressByRelativePath
+        PackRuleName: JxqyPackByDomainAndScene
+        FilterRuleName: JxqyCollectRuntimeContent
+        AssetTags: xin-jian-xia
+        UserData: StopDependencyTraversalAtCollectorRoot
+  - PackageName: JxShared_XinJianXiaBase
+    PackageDesc: Shared formal Xin Jian Xia resources referenced by official Mods
+    EnableAddressable: 1
+    SupportExtensionless: 0
+    LocationToLower: 0
+    IncludeAssetGUID: 1
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: XinJianXiaSharedBase
+      GroupDesc: Referenced formal resources only; no Mod script or save state
+      AssetTags: jx-shared-xin-jian-xia-base
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Shared/JxShared_XinJianXiaBase/Content
+        CollectorGUID: a039b12c3a43447799f333762599639c
+        CollectorType: 0
+        AddressRuleName: JxqyAddressByRelativePath
+        PackRuleName: JxqyPackByDomainAndScene
+        FilterRuleName: JxqyCollectRuntimeContent
+        AssetTags: jx-shared-xin-jian-xia-base
+        UserData: StopDependencyTraversalAtCollectorRoot
+  - PackageName: JxShared_DaoJian543Base
+    PackageDesc: Shared DaoJian 5.4.3 engine resources referenced by compatible Mods
+    EnableAddressable: 1
+    SupportExtensionless: 0
+    LocationToLower: 0
+    IncludeAssetGUID: 1
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: DaoJian543SharedBase
+      GroupDesc: Referenced engine resources only; no Mod script or save state
+      AssetTags: jx-shared-dao-jian-543-base
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Shared/JxShared_DaoJian543Base/Content
+        CollectorGUID: df7b013701da4a33bbf9ea13cd30d2b9
+        CollectorType: 0
+        AddressRuleName: JxqyAddressByRelativePath
+        PackRuleName: JxqyPackByDomainAndScene
+        FilterRuleName: JxqyCollectRuntimeContent
+        AssetTags: jx-shared-dao-jian-543-base
+        UserData: StopDependencyTraversalAtCollectorRoot
+  - PackageName: JxMod_LengJianHanMei
+    PackageDesc: MG Leng Jian Han Mei V1.0.3 isolated Mod content
+    EnableAddressable: 1
+    SupportExtensionless: 0
+    LocationToLower: 0
+    IncludeAssetGUID: 1
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: LengJianHanMeiContent
+      GroupDesc: Converted cold-sword Mod-owned content
+      AssetTags: leng-jian-han-mei
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Mods/LengJianHanMei/Content
+        CollectorGUID: 51f074987efec39428858e37f6432094
+        CollectorType: 0
+        AddressRuleName: JxqyAddressByRelativePath
+        PackRuleName: JxqyPackByDomainAndScene
+        FilterRuleName: JxqyCollectRuntimeContent
+        AssetTags: leng-jian-han-mei
+        UserData: StopDependencyTraversalAtCollectorRoot
+  - PackageName: JxMod_MengLiHuiMou
+    PackageDesc: Meng Li Hui Mou 1.011 isolated Mod content
+    EnableAddressable: 1
+    SupportExtensionless: 0
+    LocationToLower: 0
+    IncludeAssetGUID: 1
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: MengLiHuiMouContent
+      GroupDesc: Converted dream Mod-owned content
+      AssetTags: meng-li-hui-mou
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Mods/MengLiHuiMou/Content
+        CollectorGUID: a7c214b481be21f438b9be2aaa1ca224
+        CollectorType: 0
+        AddressRuleName: JxqyAddressByRelativePath
+        PackRuleName: JxqyPackByDomainAndScene
+        FilterRuleName: JxqyCollectRuntimeContent
+        AssetTags: meng-li-hui-mou
+        UserData: StopDependencyTraversalAtCollectorRoot
+  - PackageName: OtherPackage
+    PackageDesc: 
+    EnableAddressable: 1
+    SupportExtensionless: 1
+    LocationToLower: 0
+    IncludeAssetGUID: 0
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: ModelGroup
+      GroupDesc: 
+      AssetTags: models
+      ActiveRuleName: EnableGroup
+      Collectors: []
+    - GroupName: SceneGroup
+      GroupDesc: 
+      AssetTags: scenes
+      ActiveRuleName: EnableGroup
+      Collectors: []
+  - PackageName: Dlc1Package
+    PackageDesc: 
+    EnableAddressable: 1
+    SupportExtensionless: 1
+    LocationToLower: 0
+    IncludeAssetGUID: 0
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: ModelGroup
+      GroupDesc: 
+      AssetTags: models
+      ActiveRuleName: EnableGroup
+      Collectors: []
+    - GroupName: SceneGroup
+      GroupDesc: 
+      AssetTags: scenes
+      ActiveRuleName: EnableGroup
+      Collectors: []
+  - PackageName: Dlc2Package
+    PackageDesc: 
+    EnableAddressable: 1
+    SupportExtensionless: 1
+    LocationToLower: 0
+    IncludeAssetGUID: 0
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: ModelGroup
+      GroupDesc: 
+      AssetTags: models
+      ActiveRuleName: EnableGroup
+      Collectors: []

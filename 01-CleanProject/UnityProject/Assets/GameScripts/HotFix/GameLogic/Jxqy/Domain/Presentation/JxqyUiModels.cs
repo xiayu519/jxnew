@@ -1,0 +1,1643 @@
+using System;
+using System.Collections.Generic;
+using Jxqy.Domain.Simulation;
+using Jxqy.Domain.World;
+
+namespace Jxqy.Domain.Presentation
+{
+    public enum JxqyUiScreen
+    {
+        Title,
+        Hud,
+        Dialogue,
+        Selection,
+        Status,
+        Inventory,
+        Equipment,
+        Training,
+        Skills,
+        Memo,
+        LittleMap,
+        Trade,
+        Menu,
+        Options,
+        SaveLoad,
+        Gamble,
+    }
+
+    public enum JxqyUiLayoutKind
+    {
+        SeparatePanels,
+        CombinedCharacterSheet,
+    }
+
+    public enum JxqyDialoguePresentation
+    {
+        Dialogue,
+        Selection,
+    }
+
+    public enum JxqySaveUiAction
+    {
+        Save,
+        Load,
+    }
+
+    public enum JxqyUiSound
+    {
+        DragUp,
+        DragDrop,
+        WindowOpen,
+        WindowClose,
+        UseGoods,
+        BuyGoods,
+        LargeButton,
+        Button,
+        Browse,
+        MainMenu,
+        GambleChoice,
+    }
+
+    public static class JxqyPartnerHeadPolicy
+    {
+        public static bool ShouldShow(JxqyNpc npc)
+        {
+            return npc != null &&
+                   npc.Kind == JxqyCharacterKind.Follower &&
+                   JxqyOriginalCharacterCatalog.GetProfileIndex(npc.Name) >= 0 &&
+                   npc.IsVisible &&
+                   !npc.IsDead;
+        }
+    }
+
+    public sealed class JxqyDialogueChoice
+    {
+        public JxqyDialogueChoice(string text, string value)
+        {
+            Text = text ?? string.Empty;
+            Value = value ?? string.Empty;
+        }
+
+        public string Text { get; }
+        public string Value { get; }
+    }
+
+    public sealed class JxqyDialoguePage
+    {
+        public string Speaker { get; set; } = string.Empty;
+        public string Text { get; set; } = string.Empty;
+        public string PortraitFileName { get; set; } = string.Empty;
+        public int SelectionCount { get; set; } = 1;
+        public int SelectionColumns { get; set; } = 1;
+        public JxqyDialoguePresentation Presentation { get; set; } =
+            JxqyDialoguePresentation.Dialogue;
+        public List<JxqyDialogueChoice> Choices { get; } =
+            new List<JxqyDialogueChoice>();
+    }
+
+    public sealed class JxqyDialogue
+    {
+        private readonly List<JxqyDialoguePage> _pages =
+            new List<JxqyDialoguePage>();
+        private readonly List<string> _selectedChoiceValues =
+            new List<string>();
+
+        public IReadOnlyList<JxqyDialoguePage> Pages => _pages;
+        public int PageIndex { get; private set; }
+        public int ChoiceIndex { get; private set; }
+        public bool IsComplete { get; private set; }
+        public JxqyDialoguePage Current =>
+            _pages.Count == 0 || IsComplete ? null : _pages[PageIndex];
+        public IReadOnlyList<string> SelectedChoiceValues =>
+            _selectedChoiceValues;
+
+        public void Add(JxqyDialoguePage page)
+        {
+            if (page == null)
+                throw new ArgumentNullException(nameof(page));
+            if (IsComplete)
+                throw new InvalidOperationException("对话已经结束。");
+            _pages.Add(page);
+        }
+
+        public void MoveChoice(int offset)
+        {
+            int count = Current?.Choices.Count ?? 0;
+            if (count == 0)
+                return;
+            ChoiceIndex = (ChoiceIndex + offset) % count;
+            if (ChoiceIndex < 0)
+                ChoiceIndex += count;
+        }
+
+        public string Confirm()
+        {
+            if (Current == null)
+                return null;
+            if (Current.Choices.Count > 0)
+            {
+                string value = Current.Choices[ChoiceIndex].Value;
+                int required = Math.Max(1, Current.SelectionCount);
+                if (required > 1)
+                {
+                    if (_selectedChoiceValues.Contains(value))
+                    {
+                        _selectedChoiceValues.Remove(value);
+                        return null;
+                    }
+                    _selectedChoiceValues.Add(value);
+                    if (_selectedChoiceValues.Count < required)
+                        return null;
+                    value = string.Join(",", _selectedChoiceValues);
+                }
+                IsComplete = true;
+                return value;
+            }
+            PageIndex++;
+            ChoiceIndex = 0;
+            if (PageIndex >= _pages.Count)
+                IsComplete = true;
+            return null;
+        }
+    }
+
+    public sealed class JxqySaveSlotView
+    {
+        public int Slot { get; set; }
+        public bool Exists { get; set; }
+        public string Description { get; set; } = "空存档";
+        public string SavedAt { get; set; } = string.Empty;
+        public byte[] SnapshotPng { get; set; }
+    }
+
+    public sealed class JxqyUiSession
+    {
+        public const int LastOriginalPlayerIndex = 3;
+
+        private readonly List<JxqyUiScreen> _stack =
+            new List<JxqyUiScreen>();
+        private int _selection;
+        private Func<int> _gambleDieRoll;
+
+        public event Action Changed;
+        public event Action<int> SaveRequested;
+        public event Action<int> LoadRequested;
+        public event Action NewGameRequested;
+        public event Action CreditsRequested;
+        public event Action QuitRequested;
+        public event Action ExitApplicationRequested;
+        public event Action<string> DialogueCompleted;
+        public event Action<bool> GambleCompleted;
+        public event Action<int> DaoJianGambleCompleted;
+        public event Action<JxqyItemDefinition> ItemUsed;
+        public event Action<JxqyInventoryEntry> ItemScriptRequested;
+        public event Action<JxqyUiSound> SoundRequested;
+        public event Action<float> MusicVolumeChanged;
+        public event Action<float> SoundVolumeChanged;
+        public event Action<int> GameSpeedChanged;
+
+        public JxqyPlayer Player { get; set; }
+        public JxqyUiLayoutKind LayoutKind { get; set; } =
+            JxqyUiLayoutKind.SeparatePanels;
+        public int PlayerIndex { get; private set; }
+        public JxqyNpc HoveredNpc { get; set; }
+        public Func<JxqyNpc> ResolveCombatTargetNpc { get; set; }
+        public JxqyInventory Inventory { get; set; }
+        public JxqyEquipmentManager Equipment { get; set; }
+        public IReadOnlyList<JxqyNpc> Npcs { get; set; } =
+            Array.Empty<JxqyNpc>();
+        public string LittleMapTextureAddress { get; set; } = string.Empty;
+        public string LittleMapName { get; set; } = string.Empty;
+        public int LittleMapViewX { get; set; }
+        public int LittleMapViewY { get; set; }
+        public Func<JxqyFloat2, bool, bool> TryMoveFromLittleMap { get; set; }
+        public Func<bool> IsRunModifierHeld { get; set; }
+        public JxqyNpc PartnerEquipmentTarget { get; private set; }
+        public JxqyCharacter EquipmentOwner =>
+            PartnerEquipmentTarget ?? (JxqyCharacter)Player;
+        public JxqyEquipmentManager ActiveEquipment =>
+            PartnerEquipmentTarget?.Equipment ?? Equipment;
+        public JxqySkillManager Skills { get; set; }
+        public JxqySkillManager ActiveSkills =>
+            PartnerEquipmentTarget?.Skills ?? Skills;
+        public JxqyShop Shop { get; set; }
+        public IReadOnlyList<string> Memos { get; set; } =
+            Array.Empty<string>();
+        public Func<bool> CanSave { get; set; }
+        public JxqyDialogue Dialogue { get; private set; }
+        public JxqyGambleSession Gamble { get; private set; }
+        public JxqyDaoJianGambleSession DaoJianGamble { get; private set; }
+        public JxqySaveUiAction SaveAction { get; set; }
+        public string Notice { get; private set; } = string.Empty;
+        public int NoticeSequence { get; private set; }
+        public string Message { get; private set; } = string.Empty;
+        public int MessageSequence { get; private set; }
+        public string SystemMessage { get; private set; } = string.Empty;
+        public int SystemMessageDurationMilliseconds { get; private set; }
+        public int SystemMessageSequence { get; private set; }
+        public bool TimerVisible { get; private set; }
+        public bool InterfaceVisible { get; private set; } = true;
+        public int TimerSeconds { get; private set; }
+        public float MusicVolume { get; private set; } = 1f;
+        public float SoundVolume { get; private set; } = 1f;
+        public int GameSpeed { get; private set; } = 2;
+        public List<JxqySaveSlotView> SaveSlots { get; } =
+            new List<JxqySaveSlotView>();
+        public JxqySkillEntry SelectedSkill { get; private set; }
+
+        public JxqyNpc ResolveTargetLifeNpc()
+        {
+            JxqyNpc combatTarget = ResolveCombatTargetNpc?.Invoke();
+            if (IsValidTargetLifeNpc(combatTarget))
+                return combatTarget;
+            return IsValidTargetLifeNpc(HoveredNpc) ? HoveredNpc : null;
+        }
+
+        private static bool IsValidTargetLifeNpc(JxqyNpc target)
+        {
+            return target != null && !target.IsDead && target.IsVisible;
+        }
+
+        public JxqyUiScreen CurrentScreen =>
+            ActiveModalScreen ??
+            RightPanelScreen ??
+            LeftPanelScreen ??
+            JxqyUiScreen.Hud;
+        public JxqyUiScreen? SharedBackdropScreen
+        {
+            get
+            {
+                JxqyUiScreen? modal = ActiveModalScreen;
+                if (modal.HasValue)
+                {
+                    return UsesSharedBackdrop(modal.Value)
+                        ? modal
+                        : null;
+                }
+                if (RightPanelScreen.HasValue)
+                    return RightPanelScreen;
+                return LeftPanelScreen;
+            }
+        }
+
+        public void SetPlayerIndex(int playerIndex, bool notify = true)
+        {
+            int normalized = Math.Max(
+                0,
+                Math.Min(LastOriginalPlayerIndex, playerIndex));
+            if (PlayerIndex == normalized)
+            {
+                if (PartnerEquipmentTarget != null)
+                {
+                    PartnerEquipmentTarget = null;
+                    if (notify)
+                        Changed?.Invoke();
+                }
+                return;
+            }
+            PlayerIndex = normalized;
+            PartnerEquipmentTarget = null;
+            if (notify)
+                Changed?.Invoke();
+        }
+        public JxqyUiScreen? ActiveModalScreen =>
+            _stack.Count == 0
+                ? null
+                : _stack[_stack.Count - 1];
+        public JxqyUiScreen? LeftPanelScreen { get; private set; }
+        public JxqyUiScreen? RightPanelScreen { get; private set; }
+        public int Selection => _selection;
+        public bool IsModal =>
+            ActiveModalScreen.HasValue ||
+            LeftPanelScreen.HasValue ||
+            RightPanelScreen.HasValue;
+        public bool RequestsGameplayPause =>
+            _stack.Contains(JxqyUiScreen.Menu) ||
+            _stack.Contains(JxqyUiScreen.Options) ||
+            _stack.Contains(JxqyUiScreen.SaveLoad) ||
+            _stack.Contains(JxqyUiScreen.Gamble);
+        public bool IsSaveAllowed => CanSave?.Invoke() ?? true;
+        public bool FadeVisible { get; private set; }
+        public bool FadeUiReady { get; private set; }
+        public float FadeOpacity { get; private set; }
+
+        public void ShowFade(float opacity)
+        {
+            if (!FadeVisible)
+                FadeUiReady = false;
+            FadeVisible = true;
+            FadeOpacity = Math.Max(0f, Math.Min(1f, opacity));
+            Changed?.Invoke();
+        }
+
+        public void SetFadeOpacity(float opacity)
+        {
+            FadeOpacity = Math.Max(0f, Math.Min(1f, opacity));
+        }
+
+        public void NotifyFadeUiReady()
+        {
+            FadeUiReady = true;
+        }
+
+        public void NotifyInventoryChanged()
+        {
+            Changed?.Invoke();
+        }
+
+        public void HideFade()
+        {
+            FadeVisible = false;
+            FadeUiReady = false;
+            FadeOpacity = 0f;
+            Changed?.Invoke();
+        }
+
+        public void SetInterfaceVisible(bool visible)
+        {
+            if (InterfaceVisible == visible)
+                return;
+            InterfaceVisible = visible;
+            Changed?.Invoke();
+        }
+
+        public void ShowTitle()
+        {
+            _stack.Clear();
+            _stack.Add(JxqyUiScreen.Title);
+            LeftPanelScreen = null;
+            RightPanelScreen = null;
+            _selection = 0;
+            ClearNotice();
+            Changed?.Invoke();
+        }
+
+        public void Open(JxqyUiScreen screen)
+        {
+            // XinJian's shipped UI has no usable cultivation window: its
+            // configuration references ASF assets that are not present.
+            if (screen == JxqyUiScreen.Training)
+                return;
+            screen = ResolveLayoutScreen(screen);
+            bool closeWindow = false;
+            bool openWindow = false;
+            if (screen == JxqyUiScreen.Hud)
+            {
+                closeWindow = HasSoundWindowOpen();
+                _stack.Clear();
+                LeftPanelScreen = null;
+                RightPanelScreen = null;
+            }
+            else if (screen == JxqyUiScreen.LittleMap)
+            {
+                // The original closes every side panel before showing the
+                // Tab map. It never layers the system menu over the map.
+                _stack.Clear();
+                LeftPanelScreen = null;
+                RightPanelScreen = null;
+                _stack.Add(screen);
+            }
+            else if (IsLeftPanelScreen(screen))
+            {
+                closeWindow = LeftPanelScreen.HasValue &&
+                              LeftPanelScreen != screen;
+                openWindow = LeftPanelScreen != screen;
+                LeftPanelScreen = screen;
+            }
+            else if (IsRightPanelScreen(screen))
+            {
+                closeWindow = RightPanelScreen.HasValue &&
+                              RightPanelScreen != screen;
+                openWindow = RightPanelScreen != screen;
+                RightPanelScreen = screen;
+            }
+            else if (ActiveModalScreen != screen)
+            {
+                _stack.Add(screen);
+                openWindow = IsSoundWindow(screen);
+            }
+            _selection = 0;
+            ClearNotice();
+            if (closeWindow)
+                RequestSound(JxqyUiSound.WindowClose);
+            if (openWindow)
+                RequestSound(JxqyUiSound.WindowOpen);
+            Changed?.Invoke();
+        }
+
+        public void Toggle(JxqyUiScreen screen)
+        {
+            if (screen == JxqyUiScreen.Training)
+                return;
+            screen = ResolveLayoutScreen(screen);
+            if (IsLeftPanelScreen(screen))
+            {
+                bool closeWindow = LeftPanelScreen == screen;
+                bool replaceWindow = LeftPanelScreen.HasValue &&
+                                     !closeWindow;
+                LeftPanelScreen =
+                    closeWindow ? null : screen;
+                _selection = 0;
+                ClearNotice();
+                if (closeWindow || replaceWindow)
+                    RequestSound(JxqyUiSound.WindowClose);
+                if (!closeWindow)
+                    RequestSound(JxqyUiSound.WindowOpen);
+                Changed?.Invoke();
+                return;
+            }
+            if (IsRightPanelScreen(screen))
+            {
+                bool closeWindow = RightPanelScreen == screen;
+                bool replaceWindow = RightPanelScreen.HasValue &&
+                                     !closeWindow;
+                RightPanelScreen =
+                    closeWindow ? null : screen;
+                _selection = 0;
+                ClearNotice();
+                if (closeWindow || replaceWindow)
+                    RequestSound(JxqyUiSound.WindowClose);
+                if (!closeWindow)
+                    RequestSound(JxqyUiSound.WindowOpen);
+                Changed?.Invoke();
+                return;
+            }
+            Open(ActiveModalScreen == screen
+                ? JxqyUiScreen.Hud
+                : screen);
+        }
+
+        public bool IsOpen(JxqyUiScreen screen)
+        {
+            screen = ResolveLayoutScreen(screen);
+            return _stack.Contains(screen) ||
+                   LeftPanelScreen == screen ||
+                   RightPanelScreen == screen;
+        }
+
+        public void Close(JxqyUiScreen screen)
+        {
+            screen = ResolveLayoutScreen(screen);
+            bool changed = _stack.RemoveAll(
+                               value => value == screen) > 0;
+            if (LeftPanelScreen == screen)
+            {
+                LeftPanelScreen = null;
+                changed = true;
+            }
+            if (RightPanelScreen == screen)
+            {
+                RightPanelScreen = null;
+                changed = true;
+            }
+            if (!changed)
+                return;
+            _selection = 0;
+            ClearNotice();
+            if (IsSoundWindow(screen))
+                RequestSound(JxqyUiSound.WindowClose);
+            Changed?.Invoke();
+        }
+
+        public void CloseSharedBackdropScreen()
+        {
+            JxqyUiScreen? screen = SharedBackdropScreen;
+            if (screen.HasValue)
+                Close(screen.Value);
+        }
+
+        public void OpenPlayerEquipment()
+        {
+            PartnerEquipmentTarget = null;
+            Toggle(JxqyUiScreen.Equipment);
+        }
+
+        private JxqyUiScreen ResolveLayoutScreen(JxqyUiScreen screen)
+        {
+            if (LayoutKind != JxqyUiLayoutKind.CombinedCharacterSheet)
+                return screen;
+            return screen == JxqyUiScreen.Status ||
+                   screen == JxqyUiScreen.Training ||
+                   screen == JxqyUiScreen.Skills
+                ? JxqyUiScreen.Equipment
+                : screen;
+        }
+
+        public void OpenPartnerEquipment(JxqyNpc partner)
+        {
+            if (partner == null ||
+                partner.Kind != JxqyCharacterKind.Follower ||
+                JxqyOriginalCharacterCatalog.GetProfileIndex(partner.Name) < 0)
+            {
+                return;
+            }
+            PartnerEquipmentTarget = partner;
+            _stack.Clear();
+            LeftPanelScreen = JxqyUiScreen.Equipment;
+            RightPanelScreen = null;
+            _selection = 0;
+            ClearNotice();
+            RequestSound(JxqyUiSound.WindowOpen);
+            Changed?.Invoke();
+        }
+
+        public bool IsEquipmentProfileAvailable(int profileIndex)
+        {
+            return profileIndex == PlayerIndex ||
+                   FindEquipmentPartner(profileIndex) != null;
+        }
+
+        public bool SelectEquipmentProfile(int profileIndex)
+        {
+            if (profileIndex == PlayerIndex)
+            {
+                if (PartnerEquipmentTarget == null)
+                    return true;
+                PartnerEquipmentTarget = null;
+                Changed?.Invoke();
+                return true;
+            }
+
+            JxqyNpc partner = FindEquipmentPartner(profileIndex);
+            if (partner == null)
+                return false;
+            if (ReferenceEquals(PartnerEquipmentTarget, partner))
+                return true;
+            PartnerEquipmentTarget = partner;
+            Changed?.Invoke();
+            return true;
+        }
+
+        private JxqyNpc FindEquipmentPartner(int profileIndex)
+        {
+            if (profileIndex < 0 ||
+                profileIndex >= JxqyOriginalCharacterCatalog.Count ||
+                Npcs == null)
+            {
+                return null;
+            }
+            foreach (JxqyNpc npc in Npcs)
+            {
+                if (npc != null &&
+                    npc.Kind == JxqyCharacterKind.Follower &&
+                    JxqyOriginalCharacterCatalog.GetProfileIndex(npc.Name) ==
+                    profileIndex)
+                {
+                    return npc;
+                }
+            }
+            return null;
+        }
+
+        public void StartDialogue(JxqyDialogue dialogue)
+        {
+            Dialogue = dialogue ?? throw new ArgumentNullException(nameof(dialogue));
+            Open(dialogue.Current?.Presentation ==
+                 JxqyDialoguePresentation.Selection
+                ? JxqyUiScreen.Selection
+                : JxqyUiScreen.Dialogue);
+        }
+
+        public void StartGamble(
+            int initialMoney,
+            int opponentType,
+            Func<int> dieRoll)
+        {
+            if (Gamble != null)
+                throw new InvalidOperationException("赌博小游戏已经开启。");
+            Gamble = new JxqyGambleSession(initialMoney, opponentType);
+            _gambleDieRoll = dieRoll ??
+                throw new ArgumentNullException(nameof(dieRoll));
+            Open(JxqyUiScreen.Gamble);
+        }
+
+        public void StartDaoJianGamble(
+            int npcMoney,
+            int gameType,
+            string opponentName,
+            Func<int> dieRoll)
+        {
+            if (Gamble != null || DaoJianGamble != null)
+            {
+                throw new InvalidOperationException(
+                    "A gamble mini-game is already open.");
+            }
+            DaoJianGamble = new JxqyDaoJianGambleSession(
+                Player?.Money ?? 0,
+                npcMoney,
+                gameType,
+                opponentName);
+            _gambleDieRoll = dieRoll ??
+                throw new ArgumentNullException(nameof(dieRoll));
+            Open(JxqyUiScreen.Gamble);
+        }
+
+        public bool AddDaoJianGambleBet() =>
+            ChangeGamble(DaoJianGamble?.AddBet() == true);
+
+        public bool CycleDaoJianGambleMultiplier() =>
+            ChangeGamble(DaoJianGamble?.CycleMultiplier() == true);
+
+        public bool BeginDaoJianGambleRoll() =>
+            ChangeGamble(DaoJianGamble?.BeginRoll() == true);
+
+        public bool ResolveDaoJianGambleRound()
+        {
+            if (DaoJianGamble == null || _gambleDieRoll == null)
+                return false;
+            bool changed = DaoJianGamble.ResolveRound(
+                _gambleDieRoll(),
+                _gambleDieRoll(),
+                _gambleDieRoll(),
+                _gambleDieRoll(),
+                _gambleDieRoll(),
+                _gambleDieRoll());
+            if (changed && Player != null)
+                Player.Money = DaoJianGamble.PlayerMoney;
+            return ChangeGamble(changed);
+        }
+
+        public bool DismissDaoJianGambleResult() =>
+            ChangeGamble(DaoJianGamble?.DismissResult() == true);
+
+        public bool RequestDaoJianGambleQuit()
+        {
+            if (DaoJianGamble == null)
+                return false;
+            bool changed = DaoJianGamble.RequestQuit();
+            if (changed &&
+                DaoJianGamble.Phase == JxqyDaoJianGamblePhase.Completed)
+            {
+                CompleteDaoJianGamble();
+                return true;
+            }
+            return ChangeGamble(changed);
+        }
+
+        public bool CompleteDaoJianGambleAfterResult()
+        {
+            if (DaoJianGamble?.CompleteAfterResult() != true)
+                return false;
+            CompleteDaoJianGamble();
+            return true;
+        }
+
+        public bool IncreaseGambleStake() =>
+            ChangeGamble(Gamble?.IncreaseStake() == true);
+
+        public bool DecreaseGambleStake() =>
+            ChangeGamble(Gamble?.DecreaseStake() == true);
+
+        public bool SelectGambleChoice(JxqyGambleChoice choice)
+        {
+            bool changed = Gamble?.Select(choice) == true;
+            if (changed)
+                RequestSound(JxqyUiSound.GambleChoice);
+            return ChangeGamble(changed);
+        }
+
+        public bool BeginGambleRoll()
+        {
+            if (Gamble == null || _gambleDieRoll == null)
+                return false;
+            JxqyGamblePhase before = Gamble.Phase;
+            if (Gamble.Phase == JxqyGamblePhase.AwaitingBet &&
+                (Gamble.Stake <= 0 || !Gamble.HasChoice))
+            {
+                Gamble.BeginRoll(1, 1, 1);
+                return ChangeGamble(Gamble.Phase != before);
+            }
+            bool changed = Gamble.BeginRoll(
+                _gambleDieRoll(),
+                _gambleDieRoll(),
+                _gambleDieRoll());
+            return ChangeGamble(changed || Gamble.Phase != before);
+        }
+
+        public bool BeginGambleOpening() =>
+            ChangeGamble(Gamble?.BeginOpening() == true);
+
+        public bool RevealGambleDice() =>
+            ChangeGamble(Gamble?.RevealDice() == true);
+
+        public bool RequestGambleQuit()
+        {
+            if (Gamble == null)
+                return false;
+            JxqyGamblePhase before = Gamble.Phase;
+            bool changed = Gamble.RequestQuit();
+            return ChangeGamble(changed || Gamble.Phase != before);
+        }
+
+        public bool DismissGambleMessage()
+        {
+            if (Gamble == null || !Gamble.DismissMessage())
+                return false;
+            if (Gamble.Phase != JxqyGamblePhase.Completed)
+                return ChangeGamble(true);
+
+            bool result = Gamble.ScriptResult;
+            if (Player != null)
+                Player.Money += Gamble.NetMoneyChange;
+            Gamble = null;
+            _gambleDieRoll = null;
+            Close(JxqyUiScreen.Gamble);
+            GambleCompleted?.Invoke(result);
+            return true;
+        }
+
+        public void CancelGamble()
+        {
+            if (Gamble == null && DaoJianGamble == null)
+                return;
+            Gamble = null;
+            DaoJianGamble = null;
+            _gambleDieRoll = null;
+            Close(JxqyUiScreen.Gamble);
+        }
+
+        private void CompleteDaoJianGamble()
+        {
+            int result = DaoJianGamble?.GambleState ?? 0;
+            DaoJianGamble = null;
+            _gambleDieRoll = null;
+            Close(JxqyUiScreen.Gamble);
+            DaoJianGambleCompleted?.Invoke(result);
+        }
+
+        private bool ChangeGamble(bool changed)
+        {
+            if (changed)
+                Changed?.Invoke();
+            return changed;
+        }
+
+        public void Cancel()
+        {
+            if (CurrentScreen == JxqyUiScreen.Title)
+            {
+                ExitApplicationRequested?.Invoke();
+                return;
+            }
+            if (IsDialogueScreen(CurrentScreen))
+                return;
+            if (CurrentScreen == JxqyUiScreen.Gamble)
+            {
+                if (DaoJianGamble != null)
+                    RequestDaoJianGambleQuit();
+                else
+                    RequestGambleQuit();
+                return;
+            }
+            CloseCurrentScreen();
+        }
+
+        private void CloseCurrentScreen()
+        {
+            bool closeWindow = IsSoundWindow(CurrentScreen);
+            if (_stack.Count > 0)
+                _stack.RemoveAt(_stack.Count - 1);
+            else if (RightPanelScreen.HasValue)
+                RightPanelScreen = null;
+            else if (LeftPanelScreen.HasValue)
+                LeftPanelScreen = null;
+            _selection = 0;
+            ClearNotice();
+            if (closeWindow)
+                RequestSound(JxqyUiSound.WindowClose);
+            Changed?.Invoke();
+        }
+
+        public void RequestSound(JxqyUiSound sound)
+        {
+            SoundRequested?.Invoke(sound);
+        }
+
+        private static bool IsLeftPanelScreen(JxqyUiScreen screen)
+        {
+            return screen == JxqyUiScreen.Status ||
+                   screen == JxqyUiScreen.Equipment ||
+                   screen == JxqyUiScreen.Training;
+        }
+
+        private static bool IsRightPanelScreen(JxqyUiScreen screen)
+        {
+            return screen == JxqyUiScreen.Inventory ||
+                   screen == JxqyUiScreen.Skills ||
+                   screen == JxqyUiScreen.Memo;
+        }
+
+        private static bool UsesSharedBackdrop(JxqyUiScreen screen)
+        {
+            return IsLeftPanelScreen(screen) ||
+                   IsRightPanelScreen(screen) ||
+                   screen == JxqyUiScreen.LittleMap ||
+                   screen == JxqyUiScreen.Menu;
+        }
+
+        private bool HasSoundWindowOpen()
+        {
+            return IsSoundWindow(ActiveModalScreen) ||
+                   IsSoundWindow(LeftPanelScreen) ||
+                   IsSoundWindow(RightPanelScreen);
+        }
+
+        private static bool IsSoundWindow(JxqyUiScreen? screen)
+        {
+            return screen.HasValue && IsSoundWindow(screen.Value);
+        }
+
+        private static bool IsSoundWindow(JxqyUiScreen screen)
+        {
+            return screen == JxqyUiScreen.Status ||
+                   screen == JxqyUiScreen.Inventory ||
+                   screen == JxqyUiScreen.Equipment ||
+                   screen == JxqyUiScreen.Training ||
+                   screen == JxqyUiScreen.Skills ||
+                   screen == JxqyUiScreen.Memo ||
+                   screen == JxqyUiScreen.Trade ||
+                   screen == JxqyUiScreen.Menu ||
+                   screen == JxqyUiScreen.Options ||
+                   screen == JxqyUiScreen.SaveLoad;
+        }
+
+        public void OpenOptions()
+        {
+            Open(JxqyUiScreen.Options);
+        }
+
+        public void SetOptionValues(
+            float musicVolume,
+            float soundVolume,
+            int gameSpeed,
+            bool notify = false)
+        {
+            MusicVolume = Math.Max(0f, Math.Min(1f, musicVolume));
+            SoundVolume = Math.Max(0f, Math.Min(1f, soundVolume));
+            GameSpeed = Math.Max(0, Math.Min(2, gameSpeed));
+            if (notify)
+                Changed?.Invoke();
+        }
+
+        public void SetMusicVolume(float volume)
+        {
+            float normalized = Math.Max(0f, Math.Min(1f, volume));
+            if (Math.Abs(MusicVolume - normalized) < 0.0001f)
+                return;
+            MusicVolume = normalized;
+            MusicVolumeChanged?.Invoke(normalized);
+            Changed?.Invoke();
+        }
+
+        public void SetSoundVolume(float volume)
+        {
+            float normalized = Math.Max(0f, Math.Min(1f, volume));
+            if (Math.Abs(SoundVolume - normalized) < 0.0001f)
+                return;
+            SoundVolume = normalized;
+            SoundVolumeChanged?.Invoke(normalized);
+            Changed?.Invoke();
+        }
+
+        public void SetGameSpeed(int speed)
+        {
+            int normalized = Math.Max(0, Math.Min(2, speed));
+            if (GameSpeed == normalized)
+                return;
+            GameSpeed = normalized;
+            GameSpeedChanged?.Invoke(normalized);
+            Changed?.Invoke();
+        }
+
+        public void SetNotice(string notice)
+        {
+            Notice = notice ?? string.Empty;
+            NoticeSequence = checked(NoticeSequence + 1);
+            Changed?.Invoke();
+        }
+
+        private void ClearNotice()
+        {
+            if (string.IsNullOrEmpty(Notice))
+                return;
+            Notice = string.Empty;
+            NoticeSequence = checked(NoticeSequence + 1);
+        }
+
+        public void ShowMessage(string message)
+        {
+            Message = message ?? string.Empty;
+            MessageSequence = checked(MessageSequence + 1);
+            Changed?.Invoke();
+        }
+
+        public void ShowSystemMessage(
+            string message,
+            int durationMilliseconds = 3000)
+        {
+            SystemMessage = message ?? string.Empty;
+            SystemMessageDurationMilliseconds = Math.Max(
+                0,
+                durationMilliseconds);
+            SystemMessageSequence = checked(SystemMessageSequence + 1);
+            Changed?.Invoke();
+        }
+
+        public void SetTimer(bool visible, int seconds)
+        {
+            int normalizedSeconds = Math.Max(0, seconds);
+            if (TimerVisible == visible &&
+                TimerSeconds == normalizedSeconds)
+            {
+                return;
+            }
+            TimerVisible = visible;
+            TimerSeconds = normalizedSeconds;
+            Changed?.Invoke();
+        }
+
+        public void Refresh()
+        {
+            Changed?.Invoke();
+        }
+
+        public void MoveSelection(int offset)
+        {
+            int count = GetRows().Count;
+            if (IsDialogueScreen(CurrentScreen))
+            {
+                Dialogue?.MoveChoice(offset);
+                Changed?.Invoke();
+                return;
+            }
+            if (count == 0)
+                return;
+            _selection = (_selection + offset) % count;
+            if (_selection < 0)
+                _selection += count;
+            Changed?.Invoke();
+        }
+
+        public void Select(int index)
+        {
+            int count = GetRows().Count;
+            if (count == 0)
+                return;
+            _selection = Math.Max(0, Math.Min(index, count - 1));
+            if (IsDialogueScreen(CurrentScreen) &&
+                Dialogue?.Current != null)
+            {
+                int choiceOffset =
+                    _selection - Dialogue.ChoiceIndex;
+                Dialogue.MoveChoice(choiceOffset);
+            }
+            Changed?.Invoke();
+        }
+
+        public bool UseInventoryItem(int index)
+        {
+            if (Inventory == null || Player == null ||
+                Player.IsDead ||
+                index < 0 || index >= Inventory.Entries.Count)
+                return false;
+            _selection = index;
+            JxqyInventoryEntry entry = Inventory.Entries[index];
+            JxqyItemDefinition item = entry.Definition;
+            bool result;
+            switch (item.Kind)
+            {
+                case JxqyItemKind.Equipment:
+                    result = ActiveEquipment != null &&
+                             EquipmentOwner != null &&
+                             ActiveEquipment.Equip(
+                                 EquipmentOwner, Inventory, item.Id);
+                    break;
+                case JxqyItemKind.Drug:
+                    if (Player.ManaLimit && item.RestoresMana)
+                    {
+                        SetNotice("内力尽失中无法使用药物恢复");
+                        return false;
+                    }
+                    result = Inventory.Use(item.Id, Player);
+                    break;
+                case JxqyItemKind.Event:
+                    result = !string.IsNullOrWhiteSpace(item.UseScript);
+                    if (result)
+                        ItemScriptRequested?.Invoke(entry);
+                    break;
+                default:
+                    result = false;
+                    break;
+            }
+            if (result && item.Kind == JxqyItemKind.Drug)
+            {
+                ItemUsed?.Invoke(item);
+                RequestSound(JxqyUiSound.UseGoods);
+            }
+            else if (!result && item.Kind == JxqyItemKind.Drug)
+            {
+                if (entry.CooldownMilliseconds > 0)
+                    SetNotice("\u7269\u54c1\u5c1a\u672a\u51b7\u5374");
+                else if (Player.Level < item.MinimumUserLevel)
+                    SetNotice("\u7b49\u7ea7\u4e0d\u8db3\uff0c\u65e0\u6cd5\u4f7f\u7528");
+                else
+                    SetNotice("\u5f53\u524d\u65e0\u6cd5\u4f7f\u7528\u8be5\u7269\u54c1");
+                return false;
+            }
+            Changed?.Invoke();
+            return result;
+        }
+
+        public bool EquipInventoryItem(int index)
+        {
+            if (ActiveEquipment == null || Inventory == null ||
+                EquipmentOwner == null ||
+                Player?.IsDead == true ||
+                index < 0 || index >= Inventory.Entries.Count)
+                return false;
+            _selection = index;
+            bool result = ActiveEquipment.Equip(
+                EquipmentOwner,
+                Inventory,
+                Inventory.Entries[index].Definition.Id);
+            Changed?.Invoke();
+            return result;
+        }
+
+        public bool Unequip(JxqyEquipmentSlot slot)
+        {
+            if (ActiveEquipment == null || Inventory == null ||
+                EquipmentOwner == null || Player?.IsDead == true)
+                return false;
+            bool result = ActiveEquipment.Unequip(
+                EquipmentOwner, Inventory, slot);
+            Changed?.Invoke();
+            return result;
+        }
+
+        public bool ExchangeEquipmentWithInventory(
+            JxqyEquipmentSlot slot,
+            int inventoryLegacyListIndex)
+        {
+            if (ActiveEquipment == null || Inventory == null ||
+                EquipmentOwner == null || Player?.IsDead == true)
+                return false;
+            bool result = ActiveEquipment.ExchangeWithInventory(
+                EquipmentOwner,
+                Inventory,
+                slot,
+                inventoryLegacyListIndex);
+            Changed?.Invoke();
+            return result;
+        }
+
+        public bool MoveInventoryEntry(
+            int sourceIndex,
+            int targetIndex)
+        {
+            if (Inventory == null)
+                return false;
+            bool result =
+                Inventory.ExchangeEntries(sourceIndex, targetIndex);
+            if (result)
+                _selection = Math.Max(0, targetIndex);
+            Changed?.Invoke();
+            return result;
+        }
+
+        public bool MoveInventoryEntryToLegacyIndex(
+            int sourceIndex,
+            int targetLegacyListIndex)
+        {
+            if (Inventory == null)
+                return false;
+            bool result = Inventory.MoveEntryToLegacyIndex(
+                sourceIndex,
+                targetLegacyListIndex);
+            Changed?.Invoke();
+            return result;
+        }
+
+        public bool MoveInventoryEntryToGoodsShortcut(
+            int sourceLegacyListIndex,
+            int targetLegacyListIndex)
+        {
+            if (Inventory == null ||
+                targetLegacyListIndex < 221 ||
+                targetLegacyListIndex > 223)
+            {
+                return false;
+            }
+            JxqyInventoryEntry entry =
+                Inventory.FindAtLegacyIndex(sourceLegacyListIndex);
+            if (entry?.Definition?.Kind != JxqyItemKind.Drug)
+                return false;
+            for (int index = 0; index < Inventory.Entries.Count; index++)
+            {
+                if (!ReferenceEquals(Inventory.Entries[index], entry))
+                    continue;
+                return MoveInventoryEntryToLegacyIndex(
+                    index,
+                    targetLegacyListIndex);
+            }
+            return false;
+        }
+
+        public bool SelectSkill(int index)
+        {
+            if (Skills == null || index < 0 || index >= Skills.Skills.Count)
+                return false;
+            _selection = index;
+            SelectedSkill = Skills.Skills[index];
+            Changed?.Invoke();
+            return true;
+        }
+
+        public void ClearSelectedSkill()
+        {
+            SelectedSkill = null;
+            _selection = 0;
+            Changed?.Invoke();
+        }
+
+        public bool MoveSkillEntry(int sourceIndex, int targetIndex)
+        {
+            if (Skills == null)
+                return false;
+            bool result = Skills.ExchangeEntries(
+                sourceIndex,
+                targetIndex);
+            if (result)
+                _selection = Math.Max(0, targetIndex);
+            Changed?.Invoke();
+            return result;
+        }
+
+        public bool MoveSkillEntryToLegacyIndex(
+            int sourceIndex,
+            int targetLegacyListIndex)
+        {
+            if (Skills == null)
+                return false;
+            bool result = Skills.MoveEntryToLegacyIndex(
+                sourceIndex,
+                targetLegacyListIndex);
+            if (result &&
+                SelectedSkill != null &&
+                (SelectedSkill.LegacyListIndex < 40 ||
+                 SelectedSkill.LegacyListIndex > 44))
+            {
+                SelectedSkill = null;
+            }
+            Changed?.Invoke();
+            return result;
+        }
+
+        public bool MoveActiveSkillEntryToLegacyIndex(
+            int sourceIndex,
+            int targetLegacyListIndex)
+        {
+            JxqySkillManager activeSkills = ActiveSkills;
+            if (activeSkills == null)
+                return false;
+            bool result = activeSkills.MoveEntryToLegacyIndex(
+                sourceIndex,
+                targetLegacyListIndex);
+            Changed?.Invoke();
+            return result;
+        }
+
+        public bool BuyShopItem(int index)
+        {
+            if (Shop == null || Inventory == null || Player == null ||
+                Player.IsDead)
+                return false;
+            var stocks = new List<JxqyShopStock>(Shop.Stock);
+            if (index < 0 || index >= stocks.Count)
+                return false;
+            bool result = Shop.Buy(
+                stocks[index].Item.Id,
+                1,
+                Player,
+                Inventory);
+            if (result)
+                RequestSound(JxqyUiSound.BuyGoods);
+            Changed?.Invoke();
+            return result;
+        }
+
+        public bool SellInventoryItem(int index)
+        {
+            if (Shop == null || Inventory == null || Player == null ||
+                Player.IsDead ||
+                index < 0 || index >= Inventory.Entries.Count)
+                return false;
+            bool result = Shop.Sell(
+                Inventory.Entries[index].Definition.Id,
+                1,
+                Player,
+                Inventory);
+            if (result)
+                RequestSound(JxqyUiSound.BuyGoods);
+            Changed?.Invoke();
+            return result;
+        }
+
+        public void OpenSaveLoad(JxqySaveUiAction action)
+        {
+            SaveAction = action;
+            Open(JxqyUiScreen.SaveLoad);
+        }
+
+        public bool RequestSave(int slotIndex)
+        {
+            bool saveAllowed = IsSaveAllowed;
+            if (slotIndex < 0 ||
+                slotIndex >= SaveSlots.Count ||
+                !saveAllowed)
+            {
+                if (!saveAllowed)
+                {
+                    Notice = "当前状态不能存档";
+                    Changed?.Invoke();
+                }
+                return false;
+            }
+            SaveAction = JxqySaveUiAction.Save;
+            _selection = slotIndex;
+            SaveRequested?.Invoke(SaveSlots[slotIndex].Slot);
+            Changed?.Invoke();
+            return true;
+        }
+
+        public bool RequestLoad(int slotIndex)
+        {
+            if (slotIndex < 0 || slotIndex >= SaveSlots.Count ||
+                !SaveSlots[slotIndex].Exists)
+                return false;
+            SaveAction = JxqySaveUiAction.Load;
+            _selection = slotIndex;
+            LoadRequested?.Invoke(SaveSlots[slotIndex].Slot);
+            Changed?.Invoke();
+            return true;
+        }
+
+        public void ReturnToTitle()
+        {
+            QuitRequested?.Invoke();
+        }
+
+        public bool Confirm()
+        {
+            bool changed;
+            switch (CurrentScreen)
+            {
+                case JxqyUiScreen.Title:
+                    changed = ConfirmTitle();
+                    break;
+                case JxqyUiScreen.Dialogue:
+                case JxqyUiScreen.Selection:
+                    changed = ConfirmDialogue();
+                    break;
+                case JxqyUiScreen.Inventory:
+                    changed = UseSelectedItem();
+                    break;
+                case JxqyUiScreen.Equipment:
+                    changed = EquipSelectedItem();
+                    break;
+                case JxqyUiScreen.Training:
+                    changed = false;
+                    break;
+                case JxqyUiScreen.Skills:
+                    changed = SelectSkill();
+                    break;
+                case JxqyUiScreen.Trade:
+                    changed = BuySelectedItem();
+                    break;
+                case JxqyUiScreen.Menu:
+                    changed = ConfirmMenu();
+                    break;
+                case JxqyUiScreen.SaveLoad:
+                    changed = ConfirmSaveSlot();
+                    break;
+                case JxqyUiScreen.Gamble:
+                    changed = BeginGambleRoll();
+                    break;
+                default:
+                    changed = false;
+                    break;
+            }
+            Changed?.Invoke();
+            return changed;
+        }
+
+        public bool Secondary()
+        {
+            if (CurrentScreen != JxqyUiScreen.Trade)
+                return false;
+            IReadOnlyList<JxqyInventoryEntry> entries =
+                Inventory?.Entries;
+            if (entries == null || entries.Count == 0)
+                return false;
+            int index = Math.Min(_selection, entries.Count - 1);
+            bool result = Shop.Sell(
+                entries[index].Definition.Id,
+                1,
+                Player,
+                Inventory);
+            if (result)
+                RequestSound(JxqyUiSound.BuyGoods);
+            Changed?.Invoke();
+            return result;
+        }
+
+        public IReadOnlyList<string> GetRows()
+        {
+            var rows = new List<string>();
+            switch (CurrentScreen)
+            {
+                case JxqyUiScreen.Title:
+                    rows.Add("开始游戏");
+                    rows.Add("读取存档");
+                    rows.Add("制作群");
+                    rows.Add("退出游戏");
+                    break;
+                case JxqyUiScreen.Dialogue:
+                case JxqyUiScreen.Selection:
+                    if (Dialogue?.Current != null)
+                    {
+                        foreach (JxqyDialogueChoice choice in
+                            Dialogue.Current.Choices)
+                            rows.Add(choice.Text);
+                    }
+                    break;
+                case JxqyUiScreen.Inventory:
+                case JxqyUiScreen.Equipment:
+                    if (Inventory != null)
+                    {
+                        foreach (JxqyInventoryEntry entry in Inventory.Entries)
+                            rows.Add($"{entry.Definition.Name} ×{entry.Count}");
+                    }
+                    break;
+                case JxqyUiScreen.Training:
+                    JxqySkillEntry cultivation =
+                        Skills?.FindAtLegacyIndex(49);
+                    if (cultivation != null)
+                    {
+                        rows.Add(
+                            $"{cultivation.Magic.Name}  " +
+                            $"Lv.{cultivation.Level}");
+                    }
+                    break;
+                case JxqyUiScreen.Skills:
+                    if (Skills != null)
+                    {
+                        foreach (JxqySkillEntry entry in Skills.Skills)
+                            rows.Add($"{entry.Magic.Id}  Lv.{entry.Level}");
+                    }
+                    break;
+                case JxqyUiScreen.Memo:
+                    if (Memos != null)
+                    {
+                        for (int index = Memos.Count - 1;
+                             index >= 0;
+                             index--)
+                        {
+                            rows.Add(Memos[index] ?? string.Empty);
+                        }
+                    }
+                    break;
+                case JxqyUiScreen.Trade:
+                    if (Shop != null)
+                    {
+                        foreach (JxqyShopStock stock in Shop.Stock)
+                        {
+                            string count = stock.IsUnlimited
+                                ? "∞"
+                                : stock.Count.ToString();
+                            rows.Add(
+                                $"{stock.Item.Name}  {stock.Item.GetBuyPrice(Shop.BuyPercentage)} ({count})");
+                        }
+                    }
+                    break;
+                case JxqyUiScreen.Menu:
+                    rows.Add("读取存储");
+                    rows.Add("游戏选项");
+                    rows.Add("退出游戏");
+                    rows.Add("返回游戏");
+                    break;
+                case JxqyUiScreen.Options:
+                    rows.Add($"游戏音乐音量 {MusicVolume:P0}");
+                    rows.Add($"游戏音效音量 {SoundVolume:P0}");
+                    rows.Add($"游戏运行速度 {GameSpeed}");
+                    rows.Add("返回");
+                    break;
+                case JxqyUiScreen.SaveLoad:
+                    foreach (JxqySaveSlotView slot in SaveSlots)
+                        rows.Add($"存档 {slot.Slot}: {slot.Description}");
+                    break;
+            }
+            return rows;
+        }
+
+        public string GetTitle()
+        {
+            switch (CurrentScreen)
+            {
+                case JxqyUiScreen.Title:
+                    return "新剑侠情缘";
+                case JxqyUiScreen.Hud: return Player?.Name ?? "HUD";
+                case JxqyUiScreen.Dialogue:
+                case JxqyUiScreen.Selection:
+                    return Dialogue?.Current?.Speaker ?? string.Empty;
+                case JxqyUiScreen.Status: return "角色状态";
+                case JxqyUiScreen.Inventory: return "物品";
+                case JxqyUiScreen.Equipment: return "装备";
+                case JxqyUiScreen.Training: return "武功修炼";
+                case JxqyUiScreen.Skills: return "武功";
+                case JxqyUiScreen.Memo: return "任务";
+                case JxqyUiScreen.Trade: return "交易";
+                case JxqyUiScreen.Menu: return "菜单";
+                case JxqyUiScreen.Options: return "游戏选项";
+                case JxqyUiScreen.SaveLoad:
+                    return SaveAction == JxqySaveUiAction.Save
+                        ? "保存游戏"
+                        : "读取游戏";
+                case JxqyUiScreen.Gamble: return "赌博";
+                default: return string.Empty;
+            }
+        }
+
+        public string GetBody()
+        {
+            switch (CurrentScreen)
+            {
+                case JxqyUiScreen.Title:
+                {
+                    IReadOnlyList<string> titleRows = GetRows();
+                    var titleLines = new List<string>(titleRows.Count);
+                    for (int index = 0;
+                         index < titleRows.Count;
+                         index++)
+                        titleLines.Add(
+                            (index == _selection ? "▶ " : "  ") +
+                            titleRows[index]);
+                    return string.Join("\n", titleLines);
+                }
+                case JxqyUiScreen.Hud:
+                case JxqyUiScreen.Status:
+                    if (Player == null)
+                        return string.Empty;
+                    return
+                        $"生命 {Player.Life}/{Player.LifeMax}\n" +
+                        $"内力 {Player.Mana}/{Player.ManaMax}\n" +
+                        $"体力 {Player.Thew}/{Player.ThewMax}\n" +
+                        $"等级 {Player.Level}  金钱 {Player.Money}";
+                case JxqyUiScreen.Dialogue:
+                case JxqyUiScreen.Selection:
+                    return Dialogue?.Current?.Text ?? string.Empty;
+                default:
+                    IReadOnlyList<string> rows = GetRows();
+                    if (rows.Count == 0)
+                        return "（空）";
+                    var lines = new List<string>(rows.Count);
+                    for (int index = 0; index < rows.Count; index++)
+                        lines.Add((index == _selection ? "▶ " : "  ") + rows[index]);
+                    return string.Join("\n", lines);
+            }
+        }
+
+        private bool ConfirmDialogue()
+        {
+            if (Dialogue == null)
+                return false;
+            string choice = Dialogue.Confirm();
+            if (Dialogue.IsComplete)
+            {
+                DialogueCompleted?.Invoke(choice);
+                Dialogue = null;
+                CloseCurrentScreen();
+            }
+            return true;
+        }
+
+        private static bool IsDialogueScreen(JxqyUiScreen screen)
+        {
+            return screen == JxqyUiScreen.Dialogue ||
+                   screen == JxqyUiScreen.Selection;
+        }
+
+        private bool UseSelectedItem()
+        {
+            if (Inventory == null || Player == null ||
+                _selection >= Inventory.Entries.Count)
+                return false;
+            return UseInventoryItem(_selection);
+        }
+
+        private bool EquipSelectedItem()
+        {
+            if (Equipment == null || Inventory == null || Player == null ||
+                _selection >= Inventory.Entries.Count)
+                return false;
+            return Equipment.Equip(
+                Player,
+                Inventory,
+                Inventory.Entries[_selection].Definition.Id);
+        }
+
+        private bool SelectSkill()
+        {
+            if (Skills == null || _selection >= Skills.Skills.Count)
+                return false;
+            SelectedSkill = Skills.Skills[_selection];
+            Cancel();
+            return true;
+        }
+
+        private bool BuySelectedItem()
+        {
+            if (Shop == null || Inventory == null || Player == null)
+                return false;
+            var stocks = new List<JxqyShopStock>(Shop.Stock);
+            if (_selection >= stocks.Count)
+                return false;
+            bool result = Shop.Buy(
+                stocks[_selection].Item.Id,
+                1,
+                Player,
+                Inventory);
+            if (result)
+                RequestSound(JxqyUiSound.BuyGoods);
+            return result;
+        }
+
+        private bool ConfirmMenu()
+        {
+            switch (_selection)
+            {
+                case 0:
+                    SaveAction = JxqySaveUiAction.Load;
+                    Open(JxqyUiScreen.SaveLoad);
+                    return true;
+                case 1:
+                    OpenOptions();
+                    return true;
+                case 2:
+                    QuitRequested?.Invoke();
+                    return true;
+                case 3:
+                    Cancel();
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private bool ConfirmTitle()
+        {
+            switch (_selection)
+            {
+                case 0:
+                    _stack.Clear();
+                    _selection = 0;
+                    NewGameRequested?.Invoke();
+                    return true;
+                case 1:
+                    SaveAction = JxqySaveUiAction.Load;
+                    Open(JxqyUiScreen.SaveLoad);
+                    return true;
+                case 2:
+                    CreditsRequested?.Invoke();
+                    return true;
+                case 3:
+                    ExitApplicationRequested?.Invoke();
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private bool ConfirmSaveSlot()
+        {
+            if (_selection >= SaveSlots.Count)
+                return false;
+            int slot = SaveSlots[_selection].Slot;
+            if (SaveAction == JxqySaveUiAction.Save)
+            {
+                if (!IsSaveAllowed)
+                {
+                    Notice = "当前状态不能存档";
+                    Changed?.Invoke();
+                    return false;
+                }
+                SaveRequested?.Invoke(slot);
+            }
+            else if (SaveSlots[_selection].Exists)
+                LoadRequested?.Invoke(slot);
+            else
+                return false;
+            return true;
+        }
+    }
+}

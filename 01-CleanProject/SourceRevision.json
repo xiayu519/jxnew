@@ -1,0 +1,18 @@
+{
+  "sourceRepository": "https://github.com/xiayu519/jhfyl.git",
+  "sourceCommit": "a81d0fa1c677b9dd3ffaa2241596ce84c4d6f59e",
+  "sourceTag": "v1.0",
+  "unityVersion": "6000.5.4f1",
+  "resourcePackage": "JxNewResources-20260828.unitypackage",
+  "resourcePackageBytes": 4495464431,
+  "resourcePackageSha256": "3EB0EAE45A094EE67F4D81E7B67BF0466488526253870C2890A2267F861B206F",
+  "resourceContent": "ExternalDownload",
+  "cleanProjectMode": "EditorSimulateMode",
+  "resourcePackages": [
+    "JxMod_XinJianXia",
+    "JxShared_XinJianXiaBase",
+    "JxShared_DaoJian543Base",
+    "JxMod_LengJianHanMei",
+    "JxMod_MengLiHuiMou"
+  ]
+}
