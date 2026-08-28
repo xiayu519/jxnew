@@ -15,18 +15,11 @@
 ## 目录结构
 
 - `01-CleanProject`：可公开克隆的 Unity 源码工程。
-- `02-WindowsIL2CPP`：本地 Windows 成品目录，不进入 Git。
-- `03-ResourcePackage`：本地资源包目录，不进入 Git。
 - `docs`：资源包结构与校验说明。
 
 ## 下载资源包
 
-- [JxNewResources-20260828 百度网盘下载信息](JxNewResources-20260828-BaiduNetdisk.txt)
-- 文件名：`JxNewResources-20260828.unitypackage`
-- 文件大小：`4,495,464,431` 字节（约 `4.19 GiB`）
-- SHA-256：`3EB0EAE45A094EE67F4D81E7B67BF0466488526253870C2890A2267F861B206F`
-
-资源包不存放在 Git 仓库中。下载后建议先核对 SHA-256，再导入工程。
+- [UnityPackage 资源包](https://github.com/xiayu519/jxnew/releases/download/resources-20260828/JxNewResources-20260828-BaiduNetdisk.txt)
 
 ## 开发环境
 
