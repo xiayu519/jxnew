@@ -27,7 +27,20 @@
 - `01-CleanProject`：可公开克隆的 Unity 源码工程。
 - `docs`：资源包结构与校验说明。
 
-## 下载资源包
+## 下载
+
+### Windows PC 体验包
+
+Windows 体验包由于超过 GitHub 单文件 2 GiB 限制，拆分为三个 ZIP；三个文件全部必需。下载后将三个 ZIP 依次解压到同一个父目录，再运行 `Verify-Packages.bat`，检查通过后运行 `XinJianXia.exe`。
+
+- [Windows PC 体验包 1/3](https://github.com/xiayu519/jxnew/releases/download/windows-il2cpp-20260830/JxNew-Windows-x64-IL2CPP-20260830-1of3.zip)
+- [Windows PC 体验包 2/3](https://github.com/xiayu519/jxnew/releases/download/windows-il2cpp-20260830/JxNew-Windows-x64-IL2CPP-20260830-2of3.zip)
+- [Windows PC 体验包 3/3](https://github.com/xiayu519/jxnew/releases/download/windows-il2cpp-20260830/JxNew-Windows-x64-IL2CPP-20260830-3of3.zip)
+- [SHA-256 校验文件](https://github.com/xiayu519/jxnew/releases/download/windows-il2cpp-20260830/JxNew-Windows-x64-IL2CPP-20260830-SHA256.txt)
+
+三个分卷共同组成完整产品，包含新剑侠情缘正式版、`MG-冷剑寒梅 V1.0.3`、`梦里回眸三张琴心传 1.011` 以及全部必需的共享资源，不能只下载其中一个分卷。
+
+### UnityPackage 资源包
 
 - [UnityPackage 资源包](https://github.com/xiayu519/jxnew/releases/download/resources-20260828/JxNewResources-20260828-BaiduNetdisk.txt)
 
